@@ -467,10 +467,10 @@ function mesh(geo,mat,x,y,z,parent,cast){
       mesh(new THREE.ConeGeometry(1.35,rand(4,7),8),lMat,x,th+2.8,z);
     }
   }
-  if(!window.COLUMNS)window.COLUMNS=[];
+  window.COLUMNS=[];
 [[-8,6,.9],[10,-7,-.4],[6,9,1.3],[-5,-9,.6]].forEach(([x,z,ry])=>{
-    window.COLUMNS.push(new THREE.Vector3(x,0,z));
-    if(!window.COLUMNS)window.COLUMNS=[];window.COLUMNS.push(new THREE.Vector3(x,0,z));const d=mesh(new THREE.CylinderGeometry(.72,.72,2.6,10),cMat,x,.72,z);
+    window.COLUMNS.push(new THREE.Vector3(x,0,z));   // one collision point per fallen column
+    const d=mesh(new THREE.CylinderGeometry(.72,.72,2.6,10),cMat,x,.72,z);
     d.rotation.z=Math.PI/2;d.rotation.y=ry;
   });
 })();
@@ -592,7 +592,9 @@ function showOverlay(id){
 
 function resetGame(){
   hero.hp=100;hero.invuln=0;hero.punchCD=0;hero.punchT=0;
-  hero.mesh.position.set(0,0,ARENA*.55);hero.mesh.rotation.y=Math.PI;hero.mesh.visible=true;
+  if(hero.deathIv){clearInterval(hero.deathIv);hero.deathIv=null;}   // stop any lingering collapse loop first
+  hero.mesh.position.set(0,0,ARENA*.55);hero.mesh.rotation.set(0,Math.PI,0);hero.mesh.visible=true;
+  if(hero.deathPool){scene.remove(hero.deathPool);hero.deathPool=null;}
   hero.hood.visible=false;hero.h1.visible=true;hero.h2.visible=true;hero.bd.visible=true;
   hero.lArm.rotation.x=0;hero.rArm.rotation.x=0;
   lion.hp=120;lion.phase='prowl'; lion.speedMult=1+(1-lion.hp/lion.maxHp)*0.5;;lion.timer=rand(1.2,2.2);lion.stagger=0;lion.contactDone=false;
@@ -610,8 +612,8 @@ function strike(){
   hero.mesh.position.addScaledVector(f,.75);clampArena(hero.mesh.position);
   setTimeout(()=>{
     if(state!=='playing')return;
-    if(hero.mesh.position.distanceTo(lion.mesh.position)<3.6&&lion.hp>0){
-      lion.hp=Math.max(0,lion.hp-5);lion.stagger+=8;lion.sinceHit=0;play1('punch');shakeAmt=Math.max(shakeAmt,.3);
+    if(hero.mesh.position.distanceTo(lion.mesh.position)<3.9&&lion.hp>0){
+      lion.hp=Math.max(0,lion.hp-6);lion.stagger+=8;lion.sinceHit=0;play1('punch');shakeAmt=Math.max(shakeAmt,.3);
       lion.mesh.position.add(lion.mesh.position.clone().sub(hero.mesh.position).setY(0).normalize().multiplyScalar(.55));
       clampArena(lion.mesh.position);spawnSparks(lion.mesh.position.clone().setY(1.6));
       if(lion.hp<=lion.maxHp*.28&&lion.phase!=='downed')enterDowned();
@@ -640,9 +642,14 @@ const bloodTickers=[];
 function hurtHero(dmg){
   if(hero.invuln>0)return;
   hero.hp=Math.max(0,hero.hp-dmg); spawnBlood(hero.mesh&&hero.mesh.position);hero.invuln=.9;hero.sinceHurt=0;play1('gasp');shakeAmt=Math.max(shakeAmt,.55);
-  const h=$('hurt');h.classList.add('flash');setTimeout(()=>h.classList.remove('flash'),110);
-  hero.mesh.position.add(hero.mesh.position.clone().sub(lion.mesh.position).setY(0).normalize().multiplyScalar(1.4));
-  clampArena(hero.mesh.position);updateBars();
+  if(hero.hp>0){
+    // survivable hit — flash the screen and stagger back
+    const h=$('hurt');h.classList.add('flash');setTimeout(()=>h.classList.remove('flash'),110);
+    hero.mesh.position.add(hero.mesh.position.clone().sub(lion.mesh.position).setY(0).normalize().multiplyScalar(1.4));
+    clampArena(hero.mesh.position);
+  }
+  // fatal blow: no flash, no knockback — he falls dead where he stands (see doDefeat)
+  updateBars();
   if(hero.hp<=0)doDefeat();
 }
 function enterDowned(){lion.phase='downed';play1('roar');$('grapple-msg').classList.add('show');$('t-seize').classList.add('show');setHint('');}
@@ -669,7 +676,35 @@ function doVictory(){
   spawnSparks(hero.mesh.position.clone().setY(2.6));stopMusic();play1('fanfare');play1('shout');
   setTimeout(()=>{showOverlay('ov-win');setTimeout(function(){var b=document.createElement('button');b.textContent='Continue';b.style.cssText='margin-top:20px;padding:12px 32px;font-family:serif;font-size:18px;background:#8b6914;color:#fff;border:none;border-radius:4px;cursor:pointer;letter-spacing:.08em;';b.onclick=function(){b.remove();playCutaway(CUTAWAY_VICTORY,function(){showOverlay('ov-title');});};document.getElementById('ov-win').appendChild(b);},400);},900);
 }
-function doDefeat(){if(state==='defeat')return;state='defeat';stopMusic();play1('dying');var _t=0;var _iv=setInterval(function(){_t+=0.06;hero.mesh.rotation.x=Math.min(Math.PI/2,_t*Math.PI/2);hero.mesh.position.y=Math.max(0,0.5*(1-_t*2));if(_t>=1)clearInterval(_iv);},30);setTimeout(()=>showOverlay('ov-lose'),900);}
+function doDefeat(){
+  if(state==='defeat')return;state='defeat';stopMusic();play1('dying');
+  // Kallias crumples where he fell; a dark pool of blood spreads out beneath him.
+  if(hero.deathPool){scene.remove(hero.deathPool);hero.deathPool=null;}
+  const pool=new THREE.Mesh(
+    new THREE.CircleGeometry(1,44),
+    new THREE.MeshBasicMaterial({color:0x4d0000,transparent:true,opacity:0,depthWrite:false}));
+  pool.rotation.x=-Math.PI/2;                                   // lay it flat on the ground
+  pool.position.set(hero.mesh.position.x,0.02,hero.mesh.position.z);
+  pool.scale.setScalar(0.25);
+  scene.add(pool);hero.deathPool=pool;
+  let _t=0;
+  if(hero.deathIv)clearInterval(hero.deathIv);
+  hero.deathIv=setInterval(function(){
+    // Stop the instant we leave 'defeat' (i.e. the player hit Rise Again). THIS is why
+    // Kallias kept staying flat on the rematch: under load this loop outlived the reset
+    // and re-flattened him on its next tick. State check kills the race deterministically.
+    if(state!=='defeat'){clearInterval(hero.deathIv);hero.deathIv=null;return;}
+    _t+=0.05;
+    const c=Math.min(1,_t);                       // collapse progress
+    hero.mesh.rotation.x=c*(Math.PI/2);           // rotate flat
+    hero.mesh.position.y=Math.max(0,0.5*(1-c*2)); // sink to the ground
+    const s=Math.min(1,_t/1.4);                   // blood keeps spreading a beat longer
+    pool.scale.setScalar(0.25+s*2.6);
+    pool.material.opacity=s*0.82;
+    if(_t>=1.5){clearInterval(hero.deathIv);hero.deathIv=null;}
+  },30);
+  setTimeout(()=>showOverlay('ov-lose'),1500);
+}
 
 function tickLion(dt,t){
   const L=lion.mesh;const toH=hero.mesh.position.clone().sub(L.position);toH.y=0;
@@ -763,11 +798,11 @@ function loop(){
     // --- collision & contact damage -------------------------------------
     const sepDist=hero.mesh.position.distanceTo(lion.mesh.position);
     // Body-overlap guard ONLY. Its radius is deliberately SMALLER than the lion's
-    // attack reach (maul 2.6 / charge 2.8) so the beast can actually make contact,
+    // attack reach (maul 2.0 / charge 2.8) so the beast can actually make contact,
     // and it is suspended entirely while the lion is lunging so a charge follows
     // through instead of bouncing off an invisible wall. (This is the fix that kept
     // getting lost: repulsion must never be wider than the thing trying to hit you.)
-    const REPEL_R=1.9;
+    const REPEL_R=1.7;
     if(lion.phase!=='telegraph'&&lion.phase!=='charge'&&sepDist<REPEL_R&&sepDist>0.01){
       const push=hero.mesh.position.clone().sub(lion.mesh.position).setY(0).normalize().multiplyScalar((REPEL_R-sepDist)*0.5);
       hero.mesh.position.add(push);lion.mesh.position.sub(push);
@@ -780,10 +815,12 @@ function loop(){
       const ld=lion.mesh.position.distanceTo(cp);
       if(ld<2.2&&ld>0.01){const pv=lion.mesh.position.clone().sub(cp).setY(0).normalize().multiplyScalar(2.2-ld);lion.mesh.position.add(pv);clampArena(lion.mesh.position);}
     });}
-    // Standing in the lion's face while it prowls or recovers gets you mauled.
-    // Radius 2.6 sits OUTSIDE the overlap guard, so it can always land.
-    if(sepDist<2.6&&(lion.phase==='prowl'||lion.phase==='recover')&&hero.invuln<=0){
-      hurtHero(8);
+    // Crowding the lion while it prowls or recovers gets you mauled. Radius 2.0 sits
+    // just OUTSIDE the overlap guard (so standing in its face still hurts) but well
+    // INSIDE punch range (3.9), leaving a clear 2.0–3.9 shell to strike from without
+    // being chip-damaged and knocked out of range mid-punch.
+    if(sepDist<2.0&&(lion.phase==='prowl'||lion.phase==='recover')&&hero.invuln<=0){
+      hurtHero(6);
     }
     if(lion.phase!=='downed')setHint(sepDist<4.5?'Strike! (Space)':'Close in on the beast');  }else if(state==='grapple'||state==='victory'||state==='defeat'){tickHero(dt,t);}
   tickSparks(dt);tickCamera(dt);const _bdt=clock.getDelta?0:0; bloodTickers.slice().forEach(function(t){t(1/60);}); renderer.render(scene,camera);
@@ -828,6 +865,7 @@ loop();
 })();
 </script>
 
+<div style="position:fixed;left:6px;bottom:4px;z-index:50;font:11px/1 monospace;color:rgba(255,255,255,.4);pointer-events:none;user-select:none;letter-spacing:.04em;">build 2026-10-05·c</div>
 <div id="cutaway-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:9999;flex-direction:column;align-items:center;justify-content:center;">
   <video id="cutaway-video" style="width:100%;height:100%;object-fit:contain;outline:none;pointer-events:none;" playsinline></video>
   <button id="cutaway-skip" style="position:absolute;top:16px;right:24px;z-index:10000;pointer-events:auto;background:rgba(0,0,0,.65);color:#fff;border:1px solid rgba(255,255,255,.5);padding:10px 22px;font-family:serif;font-size:16px;cursor:pointer;border-radius:4px;letter-spacing:.08em;">Skip ›</button>
