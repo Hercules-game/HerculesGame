@@ -252,8 +252,11 @@ function lerpAngle(a,b,t){let d=((b-a+Math.PI*3)%(Math.PI*2))-Math.PI;return a+d
 // ── cutaway video system ──
 const CUTAWAY_INTRO='https://raw.githubusercontent.com/Hercules-game/HerculesGame/main/cutaway-intro.mp4';
 const CUTAWAY_VICTORY='https://raw.githubusercontent.com/Hercules-game/HerculesGame/main/cutaway-victory.mp4';
-const cutawayOverlay=document.getElementById('cutaway-overlay');
-const cutawayVideo=document.getElementById('cutaway-video');
+let cutawayOverlay,cutawayVideo;
+document.addEventListener('DOMContentLoaded',function(){
+  cutawayOverlay=document.getElementById('cutaway-overlay');
+  cutawayVideo=document.getElementById('cutaway-video');
+});
 let cutawayCallback=null;
 function playCutaway(url,cb){
   cutawayCallback=cb||null;
@@ -267,7 +270,10 @@ function endCutaway(){
   if(cutawayCallback){var cb=cutawayCallback;cutawayCallback=null;cb();}
 }
 function skipCutaway(){endCutaway();}
-cutawayVideo.addEventListener('ended',endCutaway);
+document.addEventListener('DOMContentLoaded',function(){
+  window.cutawayVideo=document.getElementById('cutaway-video');
+  if(cutawayVideo)cutawayVideo.addEventListener('ended',endCutaway);
+});
 
 // ── audio (external files on GitHub Pages) ──
 const SRC={
