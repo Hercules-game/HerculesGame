@@ -10,7 +10,7 @@
 html,body{height:100%;background:#0d0a06;overflow:hidden;
   font-family:'Spectral',Georgia,serif;color:#efe7d6;}
 #app{position:fixed;inset:0;}
-canvas{display:block;position:absolute;inset:0;z-index:0;}
+canvas{display:block;position:absolute;inset:0;z-index:0;visibility:hidden;}
 #hud{position:absolute;inset:0;z-index:1;pointer-events:none;}
 .bar-wrap{position:absolute;top:16px;width:280px;}
 .bar-wrap.left{left:16px;}
@@ -145,7 +145,7 @@ h1 .sub{display:block;font-size:24px;font-weight:600;letter-spacing:.06em;
 <body>
 <div id="app">
   <div id="hud">
-    <div class="bar-wrap left"><div class="bar-label">HERACLES</div>
+    <div class="bar-wrap left"><div class="bar-label">KALLIAS</div>
       <div class="bar"><div id="hero-fill" class="fill hero"></div></div></div>
     <div class="bar-wrap right" id="lion-bar"><div class="bar-label">NEMEAN LION</div>
       <div class="bar"><div id="lion-fill" class="fill lion"></div></div></div>
@@ -203,7 +203,7 @@ h1 .sub{display:block;font-size:24px;font-weight:600;letter-spacing:.06em;
 
   <div class="overlay hidden" id="ov-lose">
     <div class="kicker">NEMEA</div>
-    <h1>Heracles Falls</h1>
+    <h1>Kallias Falls</h1>
     <p class="lore">Even a son of Zeus may be brought low. Rise and try again.</p>
     <button class="btn" id="btn-retry">Rise Again</button>
   </div>
@@ -252,12 +252,12 @@ function lerpAngle(a,b,t){let d=((b-a+Math.PI*3)%(Math.PI*2))-Math.PI;return a+d
 // ── cutaway video system ──
 const CUTAWAY_INTRO='https://raw.githubusercontent.com/Hercules-game/HerculesGame/main/cutaway-intro.mp4';
 const CUTAWAY_VICTORY='https://raw.githubusercontent.com/Hercules-game/HerculesGame/main/cutaway-victory.mp4';
-let cutawayOverlay,cutawayVideo;
+let cutawayOverlay,cutawayVideo,cutawayCallback=null;
 document.addEventListener('DOMContentLoaded',function(){
   cutawayOverlay=document.getElementById('cutaway-overlay');
   cutawayVideo=document.getElementById('cutaway-video');
+  if(cutawayVideo)cutawayVideo.addEventListener('ended',endCutaway);
 });
-let cutawayCallback=null;
 function playCutaway(url,cb){
   cutawayCallback=cb||null;
   cutawayOverlay.style.display='flex';
@@ -777,7 +777,7 @@ if(lion.phase!=='downed')setHint(sepDist<4.5?'Strike! (Space)':'Close in on the 
   tickSparks(dt);tickCamera(dt);const _bdt=clock.getDelta?0:0; bloodTickers.slice().forEach(function(t){t(1/60);}); renderer.render(scene,camera);
 }
 
-function startGame(){unlockAudio();resetGame();state='playing';showOverlay(null);setHint('Close in and strike (Space)');playMusic('combat');titleMusicStarted=true;}
+function startGame(){document.querySelector('canvas').style.visibility='visible';unlockAudio();resetGame();state='playing';showOverlay(null);setHint('Close in and strike (Space)');playMusic('combat');titleMusicStarted=true;}
 
 // ── title screen interaction ──────────────────────────────────────────────
 function showTitleContent(){$('click-prompt').classList.add('hidden');$('title-content').classList.remove('tcon-hidden');}
