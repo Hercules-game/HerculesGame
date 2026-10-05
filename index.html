@@ -251,28 +251,33 @@ function lerpAngle(a,b,t){let d=((b-a+Math.PI*3)%(Math.PI*2))-Math.PI;return a+d
 // ── cutaway video system ──
 const CUTAWAY_INTRO='https://raw.githubusercontent.com/Hercules-game/HerculesGame/main/cutaway-intro.mp4';
 const CUTAWAY_VICTORY='https://raw.githubusercontent.com/Hercules-game/HerculesGame/main/cutaway-victory.mp4';
-let cutawayOverlay,cutawayVideo,cutawayCallback=null;
-document.addEventListener('DOMContentLoaded',function(){
+let cutawayOverlay,cutawayVideo,cutawayCallback=null,cutawayWired=false;
+function initCutaway(){
   cutawayOverlay=document.getElementById('cutaway-overlay');
   cutawayVideo=document.getElementById('cutaway-video');
+  if(cutawayWired||!cutawayOverlay)return;        // only wire listeners once
   if(cutawayVideo)cutawayVideo.addEventListener('ended',endCutaway);
-});
+  var skipBtn=document.getElementById('cutaway-skip');
+  if(skipBtn)skipBtn.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();endCutaway();});
+  cutawayWired=true;
+}
+// Wire as soon as the DOM is ready — works whether or not DOMContentLoaded has already fired.
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initCutaway);
+else initCutaway();
 function playCutaway(url,cb){stopMusic();
   cutawayCallback=cb||null;
+  if(!cutawayOverlay||!cutawayVideo)initCutaway();  // self-heal if called before wiring
   cutawayOverlay.style.display='flex';
   cutawayVideo.src=url; cutawayVideo.currentTime=0;
   cutawayVideo.play().catch(function(){});
 }
 function endCutaway(){
+  if(!cutawayOverlay)return;
   cutawayOverlay.style.display='none';
-  cutawayVideo.pause(); cutawayVideo.src='';
+  if(cutawayVideo){cutawayVideo.pause();cutawayVideo.src='';}
   if(cutawayCallback){var cb=cutawayCallback;cutawayCallback=null;cb();}
 }
 window.skipCutaway=function(){endCutaway();};
-document.addEventListener('DOMContentLoaded',function(){
-  window.cutawayVideo=document.getElementById('cutaway-video');
-  if(cutawayVideo)cutawayVideo.addEventListener('ended',endCutaway);
-});
 
 // ── audio (external files on GitHub Pages) ──
 const SRC={
@@ -755,24 +760,32 @@ function loop(){
   if(state==='playing'){
     tickHero(dt,t);tickLion(dt,t);tickRegen(dt);
     if(lion.hp<lion.maxHp)$('lion-bar').classList.add('show');
-    // collision repulsion — prevent overlap
-const sepDist=hero.mesh.position.distanceTo(lion.mesh.position);
-if(sepDist<3.2&&sepDist>0.01){
-  const push=hero.mesh.position.clone().sub(lion.mesh.position).setY(0).normalize().multiplyScalar((3.2-sepDist)*0.5);
-  hero.mesh.position.add(push);lion.mesh.position.sub(push);
-  clampArena(hero.mesh.position);clampArena(lion.mesh.position);
-// column collision
-if(window.COLUMNS){window.COLUMNS.forEach(function(cp){
-  const hd=hero.mesh.position.distanceTo(cp);
-  if(hd<1.6&&hd>0.01){const pv=hero.mesh.position.clone().sub(cp).setY(0).normalize().multiplyScalar(1.6-hd);hero.mesh.position.add(pv);clampArena(hero.mesh.position);}
-  const ld=lion.mesh.position.distanceTo(cp);
-  if(ld<2.2&&ld>0.01){const pv=lion.mesh.position.clone().sub(cp).setY(0).normalize().multiplyScalar(2.2-ld);lion.mesh.position.add(pv);clampArena(lion.mesh.position);}
-});}
-}
-if(sepDist<2.0&&(lion.phase==='prowl'||lion.phase==='recover')&&hero.invuln<=0){
-  hurtHero(8);
-}
-if(lion.phase!=='downed')setHint(sepDist<4.5?'Strike! (Space)':'Close in on the beast');  }else if(state==='grapple'||state==='victory'||state==='defeat'){tickHero(dt,t);}
+    // --- collision & contact damage -------------------------------------
+    const sepDist=hero.mesh.position.distanceTo(lion.mesh.position);
+    // Body-overlap guard ONLY. Its radius is deliberately SMALLER than the lion's
+    // attack reach (maul 2.6 / charge 2.8) so the beast can actually make contact,
+    // and it is suspended entirely while the lion is lunging so a charge follows
+    // through instead of bouncing off an invisible wall. (This is the fix that kept
+    // getting lost: repulsion must never be wider than the thing trying to hit you.)
+    const REPEL_R=1.9;
+    if(lion.phase!=='telegraph'&&lion.phase!=='charge'&&sepDist<REPEL_R&&sepDist>0.01){
+      const push=hero.mesh.position.clone().sub(lion.mesh.position).setY(0).normalize().multiplyScalar((REPEL_R-sepDist)*0.5);
+      hero.mesh.position.add(push);lion.mesh.position.sub(push);
+      clampArena(hero.mesh.position);clampArena(lion.mesh.position);
+    }
+    // Column collision — always on, independent of distance to the lion.
+    if(window.COLUMNS){window.COLUMNS.forEach(function(cp){
+      const hd=hero.mesh.position.distanceTo(cp);
+      if(hd<1.6&&hd>0.01){const pv=hero.mesh.position.clone().sub(cp).setY(0).normalize().multiplyScalar(1.6-hd);hero.mesh.position.add(pv);clampArena(hero.mesh.position);}
+      const ld=lion.mesh.position.distanceTo(cp);
+      if(ld<2.2&&ld>0.01){const pv=lion.mesh.position.clone().sub(cp).setY(0).normalize().multiplyScalar(2.2-ld);lion.mesh.position.add(pv);clampArena(lion.mesh.position);}
+    });}
+    // Standing in the lion's face while it prowls or recovers gets you mauled.
+    // Radius 2.6 sits OUTSIDE the overlap guard, so it can always land.
+    if(sepDist<2.6&&(lion.phase==='prowl'||lion.phase==='recover')&&hero.invuln<=0){
+      hurtHero(8);
+    }
+    if(lion.phase!=='downed')setHint(sepDist<4.5?'Strike! (Space)':'Close in on the beast');  }else if(state==='grapple'||state==='victory'||state==='defeat'){tickHero(dt,t);}
   tickSparks(dt);tickCamera(dt);const _bdt=clock.getDelta?0:0; bloodTickers.slice().forEach(function(t){t(1/60);}); renderer.render(scene,camera);
 }
 
@@ -816,8 +829,8 @@ loop();
 </script>
 
 <div id="cutaway-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:9999;flex-direction:column;align-items:center;justify-content:center;">
-  <video id="cutaway-video" style="width:100%;height:100%;object-fit:contain;outline:none;" playsinline></video>
-  <button id="cutaway-skip" onclick="skipCutaway()" style="position:absolute;top:16px;right:24px;background:rgba(0,0,0,.55);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 16px;font-family:serif;font-size:14px;cursor:pointer;border-radius:4px;letter-spacing:.08em;">Skip ›</button>
+  <video id="cutaway-video" style="width:100%;height:100%;object-fit:contain;outline:none;pointer-events:none;" playsinline></video>
+  <button id="cutaway-skip" style="position:absolute;top:16px;right:24px;z-index:10000;pointer-events:auto;background:rgba(0,0,0,.65);color:#fff;border:1px solid rgba(255,255,255,.5);padding:10px 22px;font-family:serif;font-size:16px;cursor:pointer;border-radius:4px;letter-spacing:.08em;">Skip ›</button>
 </div>
 <!-- Default Statcounter code for Legends of Kallias
 https://hercules-game.github.io/HerculesGame/ -->
