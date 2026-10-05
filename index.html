@@ -531,7 +531,7 @@ const hero={hp:100,maxHp:100,invuln:0,punchCD:0,punchT:0,sinceHurt:0};
 })();
 
 // lion
-const lion={hp:140,maxHp:140,phase:'prowl',timer:rand(1.2,2.2),stagger:0,contactDone:false,sinceHit:0};
+const lion={hp:140,maxHp:140,phase:'prowl',timer:rand(0.8,1.4),stagger:0,contactDone:false,sinceHit:0};
 lion.chargeDir=new THREE.Vector3();
 (function(){
   const root=new THREE.Group();
@@ -683,11 +683,11 @@ function tickLion(dt,t){
     lion.timer-=dt;if(lion.timer<=0){lion.phase='charge';lion.timer=.65;L.position.y=0;play1('roar');}
   }else if(lion.phase==='charge'){
     L.position.addScaledVector(lion.chargeDir,20*dt);clampArena(L.position);
-    if(hero.mesh.position.distanceTo(L.position)<3.8){hurtHero(20);}
-    lion.timer-=dt;if(lion.timer<=0){lion.phase='recover';lion.timer=1.1;}
+    if(!lion.contactDone&&hero.mesh.position.distanceTo(L.position)<2.8){lion.contactDone=true;hurtHero(16);}
+    lion.timer-=dt;if(lion.timer<=0){lion.phase='recover';lion.timer=0.7;}
     lion.legs.forEach((lg,i)=>lg.rotation.x=Math.sin(t*12)*.5*(i%2?1:-1));
   }else if(lion.phase==='recover'){
-    lion.timer-=dt;if(lion.timer<=0){lion.phase='prowl';lion.timer=rand(1.4,2.6);}
+    lion.timer-=dt;if(lion.timer<=0){lion.phase='prowl';lion.timer=rand(0.7,1.4);}
     lion.legs.forEach(lg=>lg.rotation.x=lerp(lg.rotation.x,0,dt*4));
   }else if(lion.phase==='stagger'){
     L.rotation.z=Math.sin(t*28)*.08;lion.timer-=dt;
@@ -769,7 +769,7 @@ if(window.COLUMNS){window.COLUMNS.forEach(function(cp){
   if(ld<2.2&&ld>0.01){const pv=lion.mesh.position.clone().sub(cp).setY(0).normalize().multiplyScalar(2.2-ld);lion.mesh.position.add(pv);clampArena(lion.mesh.position);}
 });}
 }
-if(sepDist<3.0&&(lion.phase==='prowl'||lion.phase==='recover')&&hero.invuln<=0){
+if(sepDist<2.0&&(lion.phase==='prowl'||lion.phase==='recover')&&hero.invuln<=0){
   hurtHero(8);
 }
 if(lion.phase!=='downed')setHint(sepDist<4.5?'Strike! (Space)':'Close in on the beast');  }else if(state==='grapple'||state==='victory'||state==='defeat'){tickHero(dt,t);}
