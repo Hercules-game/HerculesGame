@@ -268,7 +268,7 @@ function endCutaway(){
   cutawayVideo.pause(); cutawayVideo.src='';
   if(cutawayCallback){var cb=cutawayCallback;cutawayCallback=null;cb();}
 }
-function skipCutaway(){endCutaway();}
+window.skipCutaway=function(){endCutaway();};
 document.addEventListener('DOMContentLoaded',function(){
   window.cutawayVideo=document.getElementById('cutaway-video');
   if(cutawayVideo)cutawayVideo.addEventListener('ended',endCutaway);
