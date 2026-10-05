@@ -162,7 +162,7 @@ h1 .sub{display:block;font-size:24px;font-weight:600;letter-spacing:.06em;
     <img id="title-bg" src="https://hercules-game.github.io/HerculesGame/title-bg.png" alt=""/>
     <div id="title-veil"></div>
     <div id="title-content" class="tcon-hidden">
-           <h1>The Return of Hercules</h1>
+           <h1>The Legends of Kallias</h1>
       
       <div id="title-btns">
         <button class="btn" id="btn-start">Begin Your Quest</button>
@@ -173,8 +173,7 @@ h1 .sub{display:block;font-size:24px;font-weight:600;letter-spacing:.06em;
   </div>
   <div id="htp-modal" class="htp-hidden">
     <div id="htp-box">
-      <div class="kicker">THE FIRST LABOUR</div>
-      <h3>The First Labour</h3>
+     <h3>The First Labour</h3>
       <p class="lore-small">A monstrous lion plagues the hills of Nemea, its golden hide
         <em>impervious to every weapon ever forged</em>. Sword and spear are useless.
         You are Kallias — corner the beast and strangle it with your <em>bare hands</em>.</p>
@@ -258,7 +257,7 @@ document.addEventListener('DOMContentLoaded',function(){
   cutawayVideo=document.getElementById('cutaway-video');
   if(cutawayVideo)cutawayVideo.addEventListener('ended',endCutaway);
 });
-function playCutaway(url,cb){
+function playCutaway(url,cb){stopMusic();
   cutawayCallback=cb||null;
   cutawayOverlay.style.display='flex';
   cutawayVideo.src=url; cutawayVideo.currentTime=0;
@@ -269,7 +268,7 @@ function endCutaway(){
   cutawayVideo.pause(); cutawayVideo.src='';
   if(cutawayCallback){var cb=cutawayCallback;cutawayCallback=null;cb();}
 }
-function skipCutaway(){endCutaway();}
+window.skipCutaway=function(){endCutaway();};function skipCutaway(){endCutaway();}
 document.addEventListener('DOMContentLoaded',function(){
   window.cutawayVideo=document.getElementById('cutaway-video');
   if(cutawayVideo)cutawayVideo.addEventListener('ended',endCutaway);
@@ -588,10 +587,10 @@ function showOverlay(id){
 
 function resetGame(){
   hero.hp=100;hero.invuln=0;hero.punchCD=0;hero.punchT=0;
-  hero.mesh.position.set(0,0,ARENA*.55);hero.mesh.rotation.y=Math.PI;hero.mesh.visible=true;
+  hero.mesh.position.set(0,0,ARENA*.55);hero.mesh.rotation.set(0,Math.PI,0);hero.mesh.visible=true;
   hero.hood.visible=false;hero.h1.visible=true;hero.h2.visible=true;hero.bd.visible=true;
   hero.lArm.rotation.x=0;hero.rArm.rotation.x=0;
-  lion.hp=120;lion.phase='prowl'; lion.speedMult=1+(1-lion.hp/lion.maxHp)*0.5;;lion.timer=rand(1.2,2.2);lion.stagger=0;lion.contactDone=false;
+  lion.hp=140;lion.phase='prowl'; lion.speedMult=1+(1-lion.hp/lion.maxHp)*0.5;;lion.timer=rand(1.2,2.2);lion.stagger=0;lion.contactDone=false;
   lion.mesh.position.set(0,0,-6);lion.mesh.rotation.set(0,0,0);lion.mesh.visible=true;
   sparks.forEach(s=>scene.remove(s.m));sparks.length=0;
   shakeAmt=0;struggleVal=0;struggleActive=false;hero.sinceHurt=0;lion.sinceHit=0;
@@ -619,18 +618,18 @@ function strike(){
 function spawnBlood(pos){
   if(!pos)return;
   const geo=new THREE.BufferGeometry();
-  const n=6, verts=new Float32Array(n*3), vels=[];
-  for(let i=0;i<n;i++){verts[i*3]=pos.x;verts[i*3+1]=pos.y+.5;verts[i*3+2]=pos.z;
-    vels.push(new THREE.Vector3((Math.random()-.5)*4,(Math.random()*.5+.5)*3,(Math.random()-.5)*4));}
+  const n=18, verts=new Float32Array(n*3), vels=[];
+  for(let i=0;i<n;i++){verts[i*3]=pos.x;verts[i*3+1]=pos.y+.6;verts[i*3+2]=pos.z;
+    vels.push(new THREE.Vector3((Math.random()-.5)*7,(Math.random()*2+0.5)*4,(Math.random()-.5)*7));}
   geo.setAttribute('position',new THREE.BufferAttribute(verts,3));
-  const mat=new THREE.PointsMaterial({color:0xcc0000,size:.18,transparent:true,opacity:1});
+  const mat=new THREE.PointsMaterial({color:0x990000,size:.32,transparent:true,opacity:1});
   const pts=new THREE.Points(geo,mat); scene.add(pts);
   let life=0;
   const tick=function(dt){life+=dt;
     const p=geo.attributes.position.array;
     for(let i=0;i<n;i++){p[i*3]+=vels[i].x*dt;p[i*3+1]+=vels[i].y*dt-.5*9.8*dt*dt;p[i*3+2]+=vels[i].z*dt;}
     geo.attributes.position.needsUpdate=true; mat.opacity=Math.max(0,1-life/.4);
-    if(life>.4){scene.remove(pts);bloodTickers.splice(bloodTickers.indexOf(tick),1);}};
+    if(life>.7){scene.remove(pts);bloodTickers.splice(bloodTickers.indexOf(tick),1);}};
   bloodTickers.push(tick);}
 const bloodTickers=[];
 function hurtHero(dmg){
@@ -665,7 +664,27 @@ function doVictory(){
   spawnSparks(hero.mesh.position.clone().setY(2.6));stopMusic();play1('fanfare');play1('shout');
   setTimeout(()=>{showOverlay('ov-win');setTimeout(function(){var b=document.createElement('button');b.textContent='Continue';b.style.cssText='margin-top:20px;padding:12px 32px;font-family:serif;font-size:18px;background:#8b6914;color:#fff;border:none;border-radius:4px;cursor:pointer;letter-spacing:.08em;';b.onclick=function(){b.remove();playCutaway(CUTAWAY_VICTORY,function(){showOverlay('ov-title');});};document.getElementById('ov-win').appendChild(b);},400);},900);
 }
-function doDefeat(){if(state==='defeat')return;state='defeat';stopMusic();play1('dying');var _t=0;var _iv=setInterval(function(){_t+=0.06;hero.mesh.rotation.x=Math.min(Math.PI/2,_t*Math.PI/2);hero.mesh.position.y=Math.max(0,0.5*(1-_t*2));if(_t>=1)clearInterval(_iv);},30);setTimeout(()=>showOverlay('ov-lose'),900);}
+function doDefeat(){
+  if(state==='defeat')return;state='defeat';stopMusic();play1('dying');
+  // smooth collapse — no flashing
+  var _t=0;
+  var _iv=setInterval(function(){
+    _t=Math.min(1,_t+0.04);
+    hero.mesh.rotation.x=(_t)*Math.PI/2;
+    hero.mesh.position.y=0.5*(1-_t);
+    if(_t>=1){
+      clearInterval(_iv);
+      // blood pool on ground
+      var poolGeo=new THREE.CircleGeometry(1.4,16);
+      var poolMat=new THREE.MeshBasicMaterial({color:0x8b0000,transparent:true,opacity:0.85});
+      var pool=new THREE.Mesh(poolGeo,poolMat);
+      pool.rotation.x=-Math.PI/2;
+      pool.position.set(hero.mesh.position.x,-0.48,hero.mesh.position.z);
+      scene.add(pool);
+    }
+  },30);
+  setTimeout(()=>showOverlay('ov-lose'),1400);
+}
 
 function tickLion(dt,t){
   const L=lion.mesh;const toH=hero.mesh.position.clone().sub(L.position);toH.y=0;
@@ -684,7 +703,7 @@ function tickLion(dt,t){
     lion.timer-=dt;if(lion.timer<=0){lion.phase='charge';lion.timer=.65;L.position.y=0;play1('roar');}
   }else if(lion.phase==='charge'){
     L.position.addScaledVector(lion.chargeDir,20*dt);clampArena(L.position);
-    if(!lion.contactDone&&hero.mesh.position.distanceTo(L.position)<2.8){lion.contactDone=true;hurtHero(16);}
+    if(hero.mesh.position.distanceTo(L.position)<2.8){if(!lion.contactDone){lion.contactDone=true;hurtHero(16);}}
     lion.timer-=dt;if(lion.timer<=0){lion.phase='recover';lion.timer=1.1;}
     lion.legs.forEach((lg,i)=>lg.rotation.x=Math.sin(t*12)*.5*(i%2?1:-1));
   }else if(lion.phase==='recover'){
@@ -817,7 +836,7 @@ loop();
 </script>
 
 <div id="cutaway-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:9999;flex-direction:column;align-items:center;justify-content:center;">
-  <video id="cutaway-video" style="max-width:100%;max-height:100%;outline:none;" playsinline></video>
+  <video id="cutaway-video" style="width:100%;height:100%;object-fit:contain;outline:none;" playsinline></video>
   <button id="cutaway-skip" onclick="skipCutaway()" style="position:absolute;top:16px;right:24px;background:rgba(0,0,0,.55);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 16px;font-family:serif;font-size:14px;cursor:pointer;border-radius:4px;letter-spacing:.08em;">Skip ›</button>
 </div>
 <!-- Default Statcounter code for Legends of Kallias
