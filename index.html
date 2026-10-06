@@ -69,6 +69,14 @@ h1 .sub{display:block;font-size:24px;font-weight:600;letter-spacing:.06em;
 .btn:hover{filter:brightness(1.08);}
 .ctrl{margin-top:20px;font-size:13px;color:#b7a988;line-height:2.1;}
 .ctrl b{color:#f6d269;}
+/* iOS Safari: stop long-press text selection, the callout menu (Look Up / Add to Quick Note),
+   and the grey tap flash. Needs the -webkit- prefixed forms; plain user-select is not enough. */
+#app,#app *,#touch,#touch *{
+  -webkit-user-select:none;user-select:none;
+  -webkit-touch-callout:none;
+  -webkit-tap-highlight-color:transparent;
+}
+#touch,.dp,#t-punch,#t-seize{touch-action:none;}
 /* touch controls */
 #touch{position:absolute;inset:0;z-index:5;pointer-events:none;}
 #dpad{position:absolute;left:calc(env(safe-area-inset-left,0px) + 18px);
@@ -860,12 +868,17 @@ $('t-punch').addEventListener('pointerdown',e=>{e.preventDefault();
 $('t-seize').addEventListener('pointerdown',e=>{e.preventDefault();
   if(state==='playing'&&lion.phase==='downed')beginGrapple();else if(state==='grapple')mash();});
 
+// iOS backstop: even with the CSS above, block long-press menus, selection and pinch/double-tap zoom.
+['contextmenu','selectstart','gesturestart','dblclick'].forEach(function(ev){
+  document.addEventListener(ev,function(e){e.preventDefault();},{passive:false});
+});
+
 showOverlay('ov-title');
 loop();
 })();
 </script>
 
-<div style="position:fixed;left:6px;bottom:4px;z-index:50;font:11px/1 monospace;color:rgba(255,255,255,.4);pointer-events:none;user-select:none;letter-spacing:.04em;">build 2026-10-05·c</div>
+<div style="position:fixed;left:6px;bottom:4px;z-index:50;font:11px/1 monospace;color:rgba(255,255,255,.4);pointer-events:none;user-select:none;letter-spacing:.04em;">build 2026-10-06·d</div>
 <div id="cutaway-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:9999;flex-direction:column;align-items:center;justify-content:center;">
   <video id="cutaway-video" style="width:100%;height:100%;object-fit:contain;outline:none;pointer-events:none;" playsinline></video>
   <button id="cutaway-skip" style="position:absolute;top:16px;right:24px;z-index:10000;pointer-events:auto;background:rgba(0,0,0,.65);color:#fff;border:1px solid rgba(255,255,255,.5);padding:10px 22px;font-family:serif;font-size:16px;cursor:pointer;border-radius:4px;letter-spacing:.08em;">Skip ›</button>
